@@ -2,36 +2,39 @@ package main
 
 import (
 	"context"
-	"fmt"
+	"flag"
 	"net"
+	"runtime"
 	"time"
 
 	"github.com/tiger-game/echo/msg"
-
 	"github.com/tiger-game/echo/serialize"
 	"github.com/tiger-game/tiger/gom"
 	"github.com/tiger-game/tiger/session"
-	"github.com/tiger-game/tiger/signal"
 )
 
+var _Mgr = NewClientMgr()
+
 func main() {
-	c := &Client{}
-	c.Connect()
+	runtime.GOMAXPROCS(runtime.NumCPU())
+	n := flag.Int("n", 1, "client number")
+	flag.Parse()
+	for i := 0; i < *n; i++ {
+		c := &Client{}
+		c.Connect()
+		_Mgr.Add(c)
+	}
 	gom.Wait()
 }
 
 type Client struct {
 	cancel context.CancelFunc
 	s      session.IRSession
-	sig    *signal.SigM
 }
 
 func (c *Client) Connect() error {
 	var ctx context.Context
 	ctx, c.cancel = context.WithCancel(context.Background())
-	c.sig = signal.NewSigM()
-	c.sig.RegisterSignalAction(signal.SIGINT, c.Close)
-	c.sig.Listen()
 	conn, err := net.Dial("tcp", "127.0.0.1:2233")
 	if err != nil {
 		return nil
@@ -49,16 +52,15 @@ func (c *Client) Connect() error {
 }
 
 func (c *Client) Run(ctx context.Context) {
-	t := time.NewTicker(time.Second)
+	t := time.NewTicker(100 * time.Millisecond)
 	for {
 		select {
 		case msg := <-c.s.Receive():
 			_ = msg
 		case <-t.C:
-			if err := c.s.Send(&msg.Echo{Data: []byte(`asdasdlasjdlasjdlkasjdkljsdlajsdlkjasdljalsdjsl`)}); err != nil {
-				fmt.Println(err)
+			if err := c.s.Send(&msg.Echo{Data: "echo 测试，能不能通过？答：能通过就好了"}); err != nil {
+				// fmt.Println(err)
 			}
-			fmt.Println("=======")
 		case <-ctx.Done():
 			return
 		}

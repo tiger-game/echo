@@ -10,7 +10,9 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-var _ message.IMessage = (*Echo)(nil)
+var (
+	_ message.IMessage = (*Echo)(nil)
+)
 
 type Echo pb.Echo
 
