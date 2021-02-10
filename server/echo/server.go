@@ -6,6 +6,8 @@ import (
 	"net"
 	"time"
 
+	"github.com/tiger-game/tiger/xtime"
+
 	"github.com/tiger-game/echo/serialize"
 
 	"github.com/tiger-game/echo/msg"
@@ -34,7 +36,7 @@ func (s *Server) Init(srv *xserver.Server) error {
 	return nil
 }
 
-func (s *Server) Run(ctx context.Context, delta int64) {
+func (s *Server) Run(ctx context.Context, delta xtime.DeltaTimeMsec) {
 	select {
 	case w := <-s.c:
 		if wrap, ok := w.(*msg.WrapMessage); ok {

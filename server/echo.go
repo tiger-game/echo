@@ -3,13 +3,12 @@ package main
 import (
 	"fmt"
 
-	echo2 "github.com/tiger-game/echo/server/echo"
-
+	"github.com/tiger-game/echo/server/echo"
 	"github.com/tiger-game/tiger/xserver"
 )
 
 func main() {
-	s := xserver.NewServer(echo2.NewServer(), xserver.ServerConfig{
+	s := xserver.NewServer(echo.NewServer(), xserver.ServerConfig{
 		Frame:  0,
 		IP:     "127.0.0.1",
 		Port:   2233,
