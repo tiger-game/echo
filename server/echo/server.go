@@ -83,10 +83,10 @@ func (s *Server) AsyncConnectMe(raw net.Conn) error {
 	conf.Init()
 	if sess, err = session.NewSession(
 		raw,
+		s.c,
 		serialize.Pack,
 		serialize.Unpack,
 		session.Id(serialize.Id()),
-		session.Output(s.c),
 		session.Configure(conf),
 	); err != nil {
 		return fmt.Errorf("xserver.Server async new session error:%v", err)

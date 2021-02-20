@@ -7,6 +7,8 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/tiger-game/tiger/signal"
+
 	"github.com/tiger-game/echo/msg"
 	"github.com/tiger-game/echo/serialize"
 	"github.com/tiger-game/tiger/gom"
@@ -19,22 +21,22 @@ func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	n := flag.Int("n", 1, "client number")
 	flag.Parse()
+	ctx, stop := signal.Monitor()
+	defer stop()
+
 	for i := 0; i < *n; i++ {
 		c := &Client{}
-		c.Connect()
+		c.Connect(ctx)
 		_Mgr.Add(c)
 	}
 	gom.Wait()
 }
 
 type Client struct {
-	cancel context.CancelFunc
-	s      session.IRSession
+	s session.IRSession
 }
 
-func (c *Client) Connect() error {
-	var ctx context.Context
-	ctx, c.cancel = context.WithCancel(context.Background())
+func (c *Client) Connect(ctx context.Context) error {
 	conn, err := net.Dial("tcp", "127.0.0.1:2233")
 	if err != nil {
 		return nil
@@ -62,12 +64,8 @@ func (c *Client) Run(ctx context.Context) {
 				// fmt.Println(err)
 			}
 		case <-ctx.Done():
+			c.s.Close()
 			return
 		}
 	}
-}
-
-func (c *Client) Close() {
-	c.s.Close()
-	c.cancel()
 }

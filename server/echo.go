@@ -3,11 +3,14 @@ package main
 import (
 	"fmt"
 
+	"github.com/tiger-game/tiger/xtime"
+
 	"github.com/tiger-game/echo/server/echo"
 	"github.com/tiger-game/tiger/xserver"
 )
 
 func main() {
+	xtime.AdjustAfterNow(60 * 60 * 1000)
 	s := xserver.NewServer(echo.NewServer(), xserver.ServerConfig{
 		Frame:  0,
 		IP:     "127.0.0.1",
