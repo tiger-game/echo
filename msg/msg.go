@@ -5,20 +5,20 @@ import (
 
 	"github.com/tiger-game/echo/pb"
 
-	"github.com/tiger-game/tiger/session/bytep"
 	"github.com/tiger-game/tiger/session/message"
+	"github.com/tiger-game/tiger/session/packet"
 	"google.golang.org/protobuf/proto"
 )
 
 var (
-	_ message.IMessage = (*Echo)(nil)
+	_ message.Messager = (*Echo)(nil)
 )
 
 type Echo pb.Echo
 
 func (e *Echo) MsgId() int16 { return 1 }
 
-func (e *Echo) Marshal(buffer *bytep.ByteStream) error {
+func (e *Echo) Marshal(buffer *packet.ByteStream) error {
 	p := (*pb.Echo)(e)
 	size := proto.Size(p)
 	b := buffer.Alloc(size)
@@ -28,7 +28,7 @@ func (e *Echo) Marshal(buffer *bytep.ByteStream) error {
 	return nil
 }
 
-func (e *Echo) Unmarshal(buffer *bytep.ByteStream) error {
+func (e *Echo) Unmarshal(buffer *packet.ByteStream) error {
 	if err := proto.Unmarshal(buffer.Bytes(), (*pb.Echo)(e)); err != nil {
 		return fmt.Errorf("message.Echo Unmarshal error: %w", err)
 	}

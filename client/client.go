@@ -7,6 +7,8 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/tiger-game/tiger/jlog"
+
 	"github.com/tiger-game/tiger/signal"
 
 	"github.com/tiger-game/echo/msg"
@@ -21,6 +23,7 @@ func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	n := flag.Int("n", 1, "client number")
 	flag.Parse()
+	jlog.GLogInit(jlog.LogLevel(jlog.ERROR), jlog.LogDir("./log"))
 	ctx, stop := signal.Monitor()
 	defer stop()
 
@@ -33,7 +36,7 @@ func main() {
 }
 
 type Client struct {
-	s session.IRSession
+	s session.RSessioner
 }
 
 func (c *Client) Connect(ctx context.Context) error {
