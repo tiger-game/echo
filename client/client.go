@@ -7,6 +7,8 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/tiger-game/tiger/channel"
+
 	"github.com/tiger-game/tiger/jlog"
 
 	"github.com/tiger-game/tiger/signal"
@@ -14,7 +16,6 @@ import (
 	"github.com/tiger-game/echo/msg"
 	"github.com/tiger-game/echo/serialize"
 	"github.com/tiger-game/tiger/gom"
-	"github.com/tiger-game/tiger/session"
 )
 
 var _Mgr = NewClientMgr()
@@ -36,7 +37,7 @@ func main() {
 }
 
 type Client struct {
-	s session.RSessioner
+	s channel.Session
 }
 
 func (c *Client) Connect(ctx context.Context) error {
@@ -44,9 +45,9 @@ func (c *Client) Connect(ctx context.Context) error {
 	if err != nil {
 		return nil
 	}
-	conf := session.Config{}
+	conf := channel.Config{}
 	conf.Init()
-	if c.s, err = session.NewRSession(conn, serialize.Pack, serialize.Unpack, session.Id(serialize.Id()), session.Configure(conf)); err != nil {
+	if c.s, err = channel.NewSession(conn, serialize.Pack, serialize.Unpack, channel.Id(serialize.Id()), channel.Configure(conf)); err != nil {
 		return err
 	}
 	c.s.Go()

@@ -6,6 +6,10 @@ import (
 	"net"
 	"time"
 
+	"github.com/tiger-game/tiger/channel/message"
+
+	"github.com/tiger-game/tiger/channel"
+
 	"go.uber.org/atomic"
 
 	"github.com/tiger-game/tiger/xtime"
@@ -13,8 +17,6 @@ import (
 	"github.com/tiger-game/echo/msg"
 	"github.com/tiger-game/echo/serialize"
 	"github.com/tiger-game/tiger/jlog"
-	"github.com/tiger-game/tiger/session"
-	"github.com/tiger-game/tiger/session/message"
 	"github.com/tiger-game/tiger/xserver"
 )
 
@@ -22,9 +24,9 @@ var _ xserver.IServer = (*Server)(nil)
 
 type Server struct {
 	base   *xserver.Server
-	c      chan message.Messager
+	c      chan message.Msg
 	logger jlog.Logger
-	smap   map[uint64]session.Sessioner
+	smap   map[uint64]channel.DispatchSession
 	reqCnt atomic.Uint64
 	qps    atomic.Uint64
 	tick   *time.Ticker
@@ -46,10 +48,10 @@ func (s *Server) Run(ctx context.Context, delta xtime.DeltaTimeMsec) {
 			s.qps.Inc()
 			s.reqCnt.Inc()
 		} else {
-			if new, ok := w.(*session.NotifyNewSession); ok {
-				s.smap[new.Id()] = new
-				new.Go()
-				s.logger.Info("New Session Id:", new.Id())
+			if n, ok := w.(*channel.NotifyNewSession); ok {
+				s.smap[n.Id()] = n
+				n.Go()
+				s.logger.Info("New Session Id:", n.Id())
 			}
 		}
 	case <-s.tick.C:
@@ -67,7 +69,7 @@ func (s *Server) handler() {
 // AsyncConnectMe run in single goroutine.
 func (s *Server) AsyncConnectMe(ctx context.Context, raw net.Conn) error {
 	var (
-		sess session.Sessioner
+		sess channel.DispatchSession
 		err  error
 	)
 	if t, ok := raw.(*net.TCPConn); ok && t == nil {
@@ -75,22 +77,21 @@ func (s *Server) AsyncConnectMe(ctx context.Context, raw net.Conn) error {
 		return nil
 	}
 
-	s.logger.Errorf("Connect Me...%T, Remote(%v)", raw, raw.RemoteAddr())
 	// 1.authorizer verify.
 
 	// 2.load data from db and init player's or service's data.
-	conf := session.Config{
+	conf := channel.Config{
 		RStreamBufferSize: 1 << 10,
 	}
 	conf.Init()
 
-	if sess, err = session.NewSession(
+	if sess, err = channel.NewDispatchSession(
 		raw,
 		s.c,
 		serialize.Pack,
 		serialize.Unpack,
-		session.Id(serialize.Id()),
-		session.Configure(conf),
+		channel.Id(serialize.Id()),
+		channel.Configure(conf),
 	); err != nil {
 		return fmt.Errorf("xserver.Server async new session error:%v", err)
 	}
@@ -113,15 +114,14 @@ func (s *Server) AsyncConnectMe(ctx context.Context, raw net.Conn) error {
 	// TODO: 4.notify router where I am.
 
 	// 5.add session to session manager.
-	sess.AsyncNotify(&session.NotifyNewSession{Sessioner: sess})
+	sess.AsyncNotify(&channel.NotifyNewSession{DispatchSession: sess})
 	return nil
 }
 
-func (s *Server) gogo(ctx context.Context, r session.RSessioner) {
+func (s *Server) gogo(ctx context.Context, r channel.Session) {
 	for {
 		select {
 		case w := <-r.Receive():
-			s.logger.Errorf("session(%v) receive info, MsgId(%v)", r.Id(), w.MsgId())
 			if wrap, ok := w.(*msg.WrapMessage); ok {
 				wrap.Sender.Send(wrap.Data)
 				s.logger.Info("Receive Info:", wrap.Sender.Id(), " Json:", wrap.Data)
@@ -143,8 +143,8 @@ func (s *Server) Stop() {
 
 func NewServer() *Server {
 	s := &Server{
-		c:    make(chan message.Messager, 16),
-		smap: make(map[uint64]session.Sessioner),
+		c:    make(chan message.Msg, 16),
+		smap: make(map[uint64]channel.DispatchSession),
 	}
 	return s
 }

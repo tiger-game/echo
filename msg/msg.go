@@ -4,14 +4,14 @@ import (
 	"fmt"
 
 	"github.com/tiger-game/echo/pb"
+	"github.com/tiger-game/tiger/channel/message"
+	"github.com/tiger-game/tiger/channel/packet"
 
-	"github.com/tiger-game/tiger/session/message"
-	"github.com/tiger-game/tiger/session/packet"
 	"google.golang.org/protobuf/proto"
 )
 
 var (
-	_ message.Messager = (*Echo)(nil)
+	_ message.Msg = (*Echo)(nil)
 )
 
 type Echo pb.Echo

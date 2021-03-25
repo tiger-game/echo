@@ -3,5 +3,7 @@ syntax="proto3";
 package pb;
 
 message Echo {
-    string data = 1;
+    string Data = 1;
+    int64 Id = 2;
+    uint64 Num = 3;
 }

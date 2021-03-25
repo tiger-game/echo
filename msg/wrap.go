@@ -1,18 +1,18 @@
 package msg
 
 import (
-	"github.com/tiger-game/tiger/session"
-	"github.com/tiger-game/tiger/session/message"
-	"github.com/tiger-game/tiger/session/packet"
+	"github.com/tiger-game/tiger/channel"
+	"github.com/tiger-game/tiger/channel/message"
+	"github.com/tiger-game/tiger/channel/packet"
 )
 
-var _ message.Messager = (*WrapMessage)(nil)
+var _ message.Msg = (*WrapMessage)(nil)
 
 type WrapMessage struct {
-	Data message.Messager
+	Data message.Msg
 
 	// other information
-	Sender session.Sessioner
+	Sender channel.DispatchSession
 }
 
 func (w *WrapMessage) MsgId() int16 {
