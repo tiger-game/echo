@@ -6,18 +6,14 @@ import (
 	"net"
 	"time"
 
-	"github.com/tiger-game/tiger/channel/message"
-
-	"github.com/tiger-game/tiger/channel"
-
-	"go.uber.org/atomic"
-
-	"github.com/tiger-game/tiger/xtime"
-
 	"github.com/tiger-game/echo/msg"
 	"github.com/tiger-game/echo/serialize"
+	"github.com/tiger-game/tiger/channel"
+	"github.com/tiger-game/tiger/channel/message"
 	"github.com/tiger-game/tiger/jlog"
 	"github.com/tiger-game/tiger/xserver"
+	"github.com/tiger-game/tiger/xtime"
+	"go.uber.org/atomic"
 )
 
 var _ xserver.IServer = (*Server)(nil)
@@ -30,6 +26,14 @@ type Server struct {
 	reqCnt atomic.Uint64
 	qps    atomic.Uint64
 	tick   *time.Ticker
+}
+
+func (s *Server) AfterInit() error {
+	return nil
+}
+
+func (s *Server) BeforeStop() {
+
 }
 
 func (s *Server) Init(srv *xserver.Server) error {

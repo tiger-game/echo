@@ -28,3 +28,4 @@ func Unpack(s channel.DispatchSession, byteStream *packet.ByteStream) (message.M
 	}
 	return &msg.WrapMessage{Data: d, Sender: s}, nil
 }
+
