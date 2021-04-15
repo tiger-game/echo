@@ -3,19 +3,17 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"net"
 	"runtime"
 	"time"
 
-	"github.com/tiger-game/tiger/channel"
-
-	"github.com/tiger-game/tiger/jlog"
-
-	"github.com/tiger-game/tiger/signal"
-
 	"github.com/tiger-game/echo/msg"
 	"github.com/tiger-game/echo/serialize"
+	"github.com/tiger-game/tiger/channel"
 	"github.com/tiger-game/tiger/gom"
+	"github.com/tiger-game/tiger/jlog"
+	"github.com/tiger-game/tiger/signal"
 )
 
 var _Mgr = NewClientMgr()
@@ -30,24 +28,27 @@ func main() {
 
 	for i := 0; i < *n; i++ {
 		c := &Client{}
-		c.Connect(ctx)
+		if err := c.Connect(ctx); err != nil {
+			fmt.Println(err)
+			continue
+		}
 		_Mgr.Add(c)
 	}
 	gom.Wait()
 }
 
 type Client struct {
-	s channel.Session
+	s *channel.ConnChannel
 }
 
 func (c *Client) Connect(ctx context.Context) error {
 	conn, err := net.Dial("tcp", "127.0.0.1:2233")
 	if err != nil {
-		return nil
+		return err
 	}
 	conf := channel.Config{}
 	conf.Init()
-	if c.s, err = channel.NewSession(conn, serialize.Pack, serialize.Unpack, channel.Id(serialize.Id()), channel.Configure(conf)); err != nil {
+	if c.s, err = channel.NewChannel(conn, serialize.Pack, serialize.Unpack, channel.Id(serialize.Id()), channel.Configure(conf)); err != nil {
 		return err
 	}
 	c.s.Go()
@@ -64,7 +65,7 @@ func (c *Client) Run(ctx context.Context) {
 		case msg := <-c.s.Receive():
 			_ = msg
 		case <-t.C:
-			if err := c.s.Send(&msg.Echo{Data: "echo 测试，能不能通过？答：能通过就好了"}); err != nil {
+			if err := c.s.SendMessage(&msg.Echo{Data: "echo 测试，能不能通过？答：能通过就好了"}); err != nil {
 				// fmt.Println(err)
 			}
 		case <-ctx.Done():
