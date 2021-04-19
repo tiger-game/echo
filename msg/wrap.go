@@ -2,14 +2,13 @@ package msg
 
 import (
 	"github.com/tiger-game/tiger/channel"
-	"github.com/tiger-game/tiger/codec/message"
-	"github.com/tiger-game/tiger/codec/packet"
+	"github.com/tiger-game/tiger/packet"
 )
 
-var _ message.Msg = (*WrapMessage)(nil)
+var _ packet.Msg = (*WrapMessage)(nil)
 
 type WrapMessage struct {
-	Data message.Msg
+	Data packet.Msg
 
 	// other information
 	Sender *channel.ConnChannel
@@ -19,10 +18,10 @@ func (w *WrapMessage) MsgId() int16 {
 	panic("implement me")
 }
 
-func (w *WrapMessage) Marshal(pack *packet.WPacket) error {
+func (w *WrapMessage) Marshal(pack packet.Packet) error {
 	panic("implement me")
 }
 
-func (w *WrapMessage) Unmarshal(pack *packet.RPacket) error {
+func (w *WrapMessage) Unmarshal(pack packet.Packet) error {
 	panic("implement me")
 }

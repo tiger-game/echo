@@ -8,6 +8,8 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/tiger-game/tiger/packet"
+
 	"github.com/tiger-game/echo/msg"
 	"github.com/tiger-game/echo/serialize"
 	"github.com/tiger-game/tiger/channel"
@@ -48,7 +50,7 @@ func (c *Client) Connect(ctx context.Context) error {
 	}
 	conf := channel.Config{}
 	conf.Init()
-	if c.s, err = channel.NewChannel(conn, serialize.Pack, serialize.Unpack, channel.Id(serialize.Id()), channel.Configure(conf)); err != nil {
+	if c.s, err = channel.NewChannel(conn, packet.NewDefaultController(msg.NewMsgFactory(), 0), channel.Id(serialize.Id()), channel.Configure(conf)); err != nil {
 		return err
 	}
 	c.s.Go()
@@ -62,7 +64,7 @@ func (c *Client) Run(ctx context.Context) {
 	t := time.NewTicker(100 * time.Millisecond)
 	for {
 		select {
-		case msg := <-c.s.Receive():
+		case msg := <-c.s.ReceiveMessage():
 			_ = msg
 		case <-t.C:
 			if err := c.s.SendMessage(&msg.Echo{Data: "echo 测试，能不能通过？答：能通过就好了"}); err != nil {

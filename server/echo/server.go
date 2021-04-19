@@ -6,10 +6,11 @@ import (
 	"net"
 	"time"
 
+	"github.com/tiger-game/tiger/packet"
+
 	"github.com/tiger-game/echo/msg"
 	"github.com/tiger-game/echo/serialize"
 	"github.com/tiger-game/tiger/channel"
-	"github.com/tiger-game/tiger/codec/message"
 	"github.com/tiger-game/tiger/jlog"
 	"github.com/tiger-game/tiger/xserver"
 	"github.com/tiger-game/tiger/xtime"
@@ -20,7 +21,7 @@ var _ xserver.IServer = (*Server)(nil)
 
 type Server struct {
 	base   *xserver.Server
-	c      chan message.Msg
+	c      chan packet.Msg
 	logger jlog.Logger
 	smap   map[uint64]*channel.ConnChannel
 	reqCnt atomic.Uint64
@@ -91,9 +92,8 @@ func (s *Server) AsyncConnectMe(ctx context.Context, raw net.Conn) error {
 
 	if ch, err = channel.NewChannelWithChan(
 		raw,
+		packet.NewDefaultController(msg.NewMsgFactory(), 0),
 		s.c,
-		serialize.Pack,
-		serialize.Unpack,
 		channel.Id(serialize.Id()),
 		channel.Configure(conf),
 	); err != nil {
@@ -102,8 +102,7 @@ func (s *Server) AsyncConnectMe(ctx context.Context, raw net.Conn) error {
 
 	/*
 		if sess, err = session.NewRSession(raw,
-			serialize.Pack,
-			serialize.Unpack,
+			packet.NewDefaultController(msg.NewMsgFactory(), 0),
 			session.Id(serialize.Id()),
 			session.Configure(conf),
 		); err != nil {
@@ -125,7 +124,7 @@ func (s *Server) AsyncConnectMe(ctx context.Context, raw net.Conn) error {
 func (s *Server) gogo(ctx context.Context, r *channel.ConnChannel) {
 	for {
 		select {
-		case w := <-r.Receive():
+		case w := <-r.ReceiveMessage():
 			if wrap, ok := w.(*msg.WrapMessage); ok {
 				wrap.Sender.SendMessage(wrap.Data)
 				s.logger.Info("Receive Info:", wrap.Sender.Id(), " Json:", wrap.Data)
@@ -147,7 +146,7 @@ func (s *Server) Stop() {
 
 func NewServer() *Server {
 	s := &Server{
-		c:    make(chan message.Msg, 16),
+		c:    make(chan packet.Msg, 16),
 		smap: make(map[uint64]*channel.ConnChannel),
 	}
 	return s
