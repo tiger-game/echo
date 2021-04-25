@@ -21,7 +21,7 @@ var _ xserver.IServer = (*Server)(nil)
 
 type Server struct {
 	base   *xserver.Server
-	c      chan channel.NetPacket
+	c      chan channel.NetMessage
 	logger jlog.Logger
 	smap   map[uint64]*channel.NetChan
 	reqCnt atomic.Uint64
@@ -142,7 +142,7 @@ func (s *Server) Stop() {
 
 func NewServer() *Server {
 	s := &Server{
-		c:    make(chan channel.NetPacket, 16),
+		c:    make(chan channel.NetMessage, 16),
 		smap: make(map[uint64]*channel.NetChan),
 	}
 	return s
