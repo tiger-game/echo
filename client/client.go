@@ -8,13 +8,12 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/tiger-game/tiger/packet"
-
 	"github.com/tiger-game/echo/msg"
 	"github.com/tiger-game/echo/serialize"
 	"github.com/tiger-game/tiger/channel"
 	"github.com/tiger-game/tiger/gom"
 	"github.com/tiger-game/tiger/jlog"
+	"github.com/tiger-game/tiger/packet"
 	"github.com/tiger-game/tiger/signal"
 )
 

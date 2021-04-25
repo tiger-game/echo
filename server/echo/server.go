@@ -21,7 +21,7 @@ var _ xserver.IServer = (*Server)(nil)
 
 type Server struct {
 	base   *xserver.Server
-	c      chan packet.Msg
+	c      chan channel.NetPacket
 	logger jlog.Logger
 	smap   map[uint64]*channel.NetChan
 	reqCnt atomic.Uint64
@@ -47,17 +47,15 @@ func (s *Server) Init(srv *xserver.Server) error {
 func (s *Server) Run(ctx context.Context, delta xtime.DeltaTimeMsec) {
 	select {
 	case w := <-s.c:
-		if wrap, ok := w.(*msg.WrapMessage); ok {
-			wrap.Sender.SendMessage(wrap.Data)
-			s.logger.Info("Receive Info:", wrap.Sender.Id(), " Json:", wrap.Data)
+		if n, ok := w.Msg.(*channel.NotifyNewSession); ok {
+			s.smap[n.Id()] = n.NetChan
+			n.Go()
+			s.logger.Info("New Session Id:", n.Id())
+		} else {
+			w.SendMessage(w)
+			s.logger.Info("Receive Info:", w.MsgId(), " Json:", w.Msg)
 			s.qps.Inc()
 			s.reqCnt.Inc()
-		} else {
-			if n, ok := w.(*channel.NotifyNewSession); ok {
-				s.smap[n.Id()] = n.NetChan
-				n.Go()
-				s.logger.Info("New Session Id:", n.Id())
-			}
 		}
 	case <-s.tick.C:
 		s.logger.Info("Total: ", s.reqCnt.Load(), ",QPS: ", s.qps.Load())
@@ -117,7 +115,7 @@ func (s *Server) AsyncConnectMe(ctx context.Context, raw net.Conn) error {
 	// TODO: 4.notify router where I am.
 
 	// 5.add session to session manager.
-	_ = ch.Signal(&channel.NotifyNewSession{NetChan: ch})
+	_ = ch.NotifyApp(&channel.NotifyNewSession{NetChan: ch})
 	return nil
 }
 
@@ -125,12 +123,10 @@ func (s *Server) gogo(ctx context.Context, r *channel.NetChan) {
 	for {
 		select {
 		case w := <-r.ReceiveMessage():
-			if wrap, ok := w.(*msg.WrapMessage); ok {
-				wrap.Sender.SendMessage(wrap.Data)
-				s.logger.Info("Receive Info:", wrap.Sender.Id(), " Json:", wrap.Data)
-				s.qps.Inc()
-				s.reqCnt.Inc()
-			}
+			w.SendMessage(w.Msg)
+			s.logger.Info("Receive Info:", w.MsgId(), " Json:", w.Msg)
+			s.qps.Inc()
+			s.reqCnt.Inc()
 		case <-ctx.Done():
 			s.logger.Errorf("session(%v) gogo quit", r.Id())
 			return
@@ -146,7 +142,7 @@ func (s *Server) Stop() {
 
 func NewServer() *Server {
 	s := &Server{
-		c:    make(chan packet.Msg, 16),
+		c:    make(chan channel.NetPacket, 16),
 		smap: make(map[uint64]*channel.NetChan),
 	}
 	return s
