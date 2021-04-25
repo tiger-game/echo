@@ -25,7 +25,7 @@ func main() {
 	n := flag.Int("n", 1, "client number")
 	flag.Parse()
 	jlog.GLogInit(jlog.LogLevel(jlog.ERROR), jlog.LogDir("./log"))
-	ctx, stop := signal.Monitor()
+	ctx, stop := signal.Signal()
 	defer stop()
 
 	for i := 0; i < *n; i++ {
@@ -40,7 +40,7 @@ func main() {
 }
 
 type Client struct {
-	s *channel.ConnChannel
+	s *channel.NetChan
 }
 
 func (c *Client) Connect(ctx context.Context) error {

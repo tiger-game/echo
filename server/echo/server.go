@@ -23,7 +23,7 @@ type Server struct {
 	base   *xserver.Server
 	c      chan packet.Msg
 	logger jlog.Logger
-	smap   map[uint64]*channel.ConnChannel
+	smap   map[uint64]*channel.NetChan
 	reqCnt atomic.Uint64
 	qps    atomic.Uint64
 	tick   *time.Ticker
@@ -54,7 +54,7 @@ func (s *Server) Run(ctx context.Context, delta xtime.DeltaTimeMsec) {
 			s.reqCnt.Inc()
 		} else {
 			if n, ok := w.(*channel.NotifyNewSession); ok {
-				s.smap[n.Id()] = n.ConnChannel
+				s.smap[n.Id()] = n.NetChan
 				n.Go()
 				s.logger.Info("New Session Id:", n.Id())
 			}
@@ -74,7 +74,7 @@ func (s *Server) handler() {
 // AsyncConnectMe run in single goroutine.
 func (s *Server) AsyncConnectMe(ctx context.Context, raw net.Conn) error {
 	var (
-		ch  *channel.ConnChannel
+		ch  *channel.NetChan
 		err error
 	)
 	if t, ok := raw.(*net.TCPConn); ok && t == nil {
@@ -117,11 +117,11 @@ func (s *Server) AsyncConnectMe(ctx context.Context, raw net.Conn) error {
 	// TODO: 4.notify router where I am.
 
 	// 5.add session to session manager.
-	_ = ch.Signal(&channel.NotifyNewSession{ConnChannel: ch})
+	_ = ch.Signal(&channel.NotifyNewSession{NetChan: ch})
 	return nil
 }
 
-func (s *Server) gogo(ctx context.Context, r *channel.ConnChannel) {
+func (s *Server) gogo(ctx context.Context, r *channel.NetChan) {
 	for {
 		select {
 		case w := <-r.ReceiveMessage():
@@ -147,7 +147,7 @@ func (s *Server) Stop() {
 func NewServer() *Server {
 	s := &Server{
 		c:    make(chan packet.Msg, 16),
-		smap: make(map[uint64]*channel.ConnChannel),
+		smap: make(map[uint64]*channel.NetChan),
 	}
 	return s
 }

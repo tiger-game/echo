@@ -11,7 +11,7 @@ type WrapMessage struct {
 	Data packet.Msg
 
 	// other information
-	Sender *channel.ConnChannel
+	Sender *channel.NetChan
 }
 
 func (w *WrapMessage) MsgId() int16 {
