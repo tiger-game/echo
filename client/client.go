@@ -60,7 +60,7 @@ func (c *Client) Connect(ctx context.Context) error {
 }
 
 func (c *Client) Run(ctx context.Context) {
-	t := time.NewTicker(100 * time.Millisecond)
+	t := time.NewTicker(30 * time.Millisecond)
 	for {
 		select {
 		case msg := <-c.s.ReceiveMessage():

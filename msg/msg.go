@@ -3,8 +3,6 @@ package msg
 import (
 	"fmt"
 
-	"github.com/tiger-game/tiger/channel"
-
 	"github.com/tiger-game/echo/pb"
 	"github.com/tiger-game/tiger/packet"
 	"google.golang.org/protobuf/proto"
@@ -50,9 +48,9 @@ func (m *messageFactory) GetMsgById(Id int16) (packet.Msg, error) {
 
 func NewMsgFactory() packet.MessageFactory {
 	m := &messageFactory{objs: map[int16]func() packet.Msg{
-		1:  func() packet.Msg { return &Echo{} },
-		-1: func() packet.Msg { return &channel.NotifyNewSession{} },
-		-2: func() packet.Msg { return &channel.NotifyCloseSession{} },
+		1: func() packet.Msg { return &Echo{} },
+		// -1: func() packet.Msg { return &channel.NotifyNewSession{} },
+		// -2: func() packet.Msg { return &channel.NotifyCloseSession{} },
 	}}
 	return m
 }
