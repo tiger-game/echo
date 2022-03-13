@@ -27,7 +27,7 @@ func main() {
 		return
 	}
 
-	if err := s.Run(); err != nil {
+	if err := s.Loop(); err != nil {
 		fmt.Printf("Run Server error: %v\n", err)
 	}
 }

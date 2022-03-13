@@ -12,7 +12,7 @@ type ClientMgr struct {
 func (c *ClientMgr) Add(client *Client) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
-	c.mgr[client.s.Id()] = client
+	c.mgr[client.s.ID()] = client
 }
 
 func (c *ClientMgr) Del(id uint64) {

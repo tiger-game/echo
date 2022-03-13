@@ -6,28 +6,32 @@ import (
 	"net"
 	"time"
 
-	"github.com/tiger-game/tiger/packet"
-
 	"github.com/tiger-game/echo/msg"
 	"github.com/tiger-game/echo/serialize"
-	"github.com/tiger-game/tiger/channel"
+	"github.com/tiger-game/tiger/io"
 	"github.com/tiger-game/tiger/jlog"
+	"github.com/tiger-game/tiger/packet"
 	"github.com/tiger-game/tiger/xserver"
 	"github.com/tiger-game/tiger/xtime"
 	"go.uber.org/atomic"
 )
 
-var _ xserver.IServer = (*Server)(nil)
+var (
+	_ xserver.IServer = (*Server)(nil)
+	_ packet.Handler  = (*Server)(nil)
+)
 
 type Server struct {
 	base   *xserver.Server
-	c      chan channel.Message
+	c      chan packet.Msg
 	logger jlog.Logger
-	smap   map[uint64]*channel.NetChan
+	smap   map[uint64]*io.WrapIO
 	reqCnt atomic.Uint64
 	qps    atomic.Uint64
 	tick   *time.Ticker
 }
+
+func (s *Server) ID() uint64 { return 1 }
 
 func (s *Server) AfterInit() error {
 	return nil
@@ -44,16 +48,16 @@ func (s *Server) Init(srv *xserver.Server) error {
 	return nil
 }
 
-func (s *Server) Run(ctx context.Context, delta xtime.DeltaTimeMsec) {
+func (s *Server) Loop(ctx context.Context, delta xtime.DeltaTimeMsec) {
 	select {
-	case w := <-s.c:
-		if n, ok := w.Msg.(*channel.NotifyNewSession); ok {
-			s.smap[n.Id()] = n.NetChan
-			n.Go()
-			s.logger.Info("New Session Id:", n.Id())
+	case msg := <-s.c:
+		if n, ok := msg.(*io.NotifyNewStream); ok {
+			s.smap[n.ID()] = n.WrapIO
+			n.Go(ctx)
+			s.logger.Info("New Session Id:", n.ID())
 		} else {
-			w.SendMessage(w)
-			s.logger.Info("Receive Info:", w.MsgId(), " Json:", w.Msg)
+			// TODO(mawei):w.SendMessage(w)
+			s.logger.Info("Receive Info:", msg.MsgID(), " Json:", msg)
 			s.qps.Inc()
 			s.reqCnt.Inc()
 		}
@@ -65,14 +69,18 @@ func (s *Server) Run(ctx context.Context, delta xtime.DeltaTimeMsec) {
 	}
 }
 
-func (s *Server) handler() {
-
+func (s *Server) Handle(ctx context.Context, msg packet.Msg) error {
+	select {
+	case <-ctx.Done():
+	case s.c <- msg:
+	}
+	return nil
 }
 
 // AsyncConnectMe run in single goroutine.
 func (s *Server) AsyncConnectMe(ctx context.Context, raw net.Conn) error {
 	var (
-		ch  *channel.NetChan
+		w   *io.WrapIO
 		err error
 	)
 	if t, ok := raw.(*net.TCPConn); ok && t == nil {
@@ -83,17 +91,17 @@ func (s *Server) AsyncConnectMe(ctx context.Context, raw net.Conn) error {
 	// 1.authorizer verify.
 
 	// 2.load data from db and init player's or service's data.
-	conf := channel.Config{
+	conf := io.Config{
 		RStreamBufferSize: 1 << 10,
 	}
 	conf.Init()
 
-	if ch, err = channel.NewChannelWithChan(
+	if w, err = io.NewWrapIO(
 		raw,
-		packet.NewDefaultController(msg.NewMsgFactory(), 0),
-		s.c,
-		channel.Id(serialize.Id()),
-		channel.Configure(conf),
+		packet.NewDefaultController(msg.NewMsgFactory()),
+		s,
+		io.WrapID(serialize.Id()),
+		io.Configure(conf),
 	); err != nil {
 		return fmt.Errorf("xserver.Server async new session error:%v", err)
 	}
@@ -115,35 +123,20 @@ func (s *Server) AsyncConnectMe(ctx context.Context, raw net.Conn) error {
 	// TODO: 4.notify router where I am.
 
 	// 5.add session to session manager.
-	_ = ch.NotifyApp(&channel.NotifyNewSession{NetChan: ch})
+	_ = s.Handle(ctx, &io.NotifyNewStream{WrapIO: w})
 	return nil
-}
-
-func (s *Server) gogo(ctx context.Context, r *channel.NetChan) {
-	for {
-		select {
-		case w := <-r.ReceiveMessage():
-			w.SendMessage(w.Msg)
-			s.logger.Info("Receive Info:", w.MsgId(), " Json:", w.Msg)
-			s.qps.Inc()
-			s.reqCnt.Inc()
-		case <-ctx.Done():
-			s.logger.Errorf("session(%v) gogo quit", r.Id())
-			return
-		}
-	}
 }
 
 func (s *Server) Stop() {
 	for _, sess := range s.smap {
-		sess.Close()
+		sess.Close(0)
 	}
 }
 
 func NewServer() *Server {
 	s := &Server{
-		c:    make(chan channel.Message, 16),
-		smap: make(map[uint64]*channel.NetChan),
+		c:    make(chan packet.Msg, 16),
+		smap: make(map[uint64]*io.WrapIO),
 	}
 	return s
 }
