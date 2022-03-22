@@ -4,6 +4,9 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"github.com/tiger-game/echo/pb"
+	"github.com/tiger-game/tiger/def"
+	"github.com/tiger-game/tiger/dispatch"
 	"github.com/tiger-game/tiger/io"
 	"net"
 	"runtime"
@@ -40,22 +43,26 @@ func main() {
 
 type Client struct {
 	s    *io.WrapIO
-	msgq chan packet.Msg
+	msgq chan def.RequestWriter
 }
 
-func (c *Client) ID() uint64 { return 2 }
+func (c *Client) Type() def.ServTP { return 0 }
+func (c *Client) ID() def.ServID   { return 0 }
 
 func (c *Client) Connect(ctx context.Context) error {
-	c.msgq = make(chan packet.Msg, 4)
+	c.msgq = make(chan def.RequestWriter, 4)
 	conn, err := net.Dial("tcp", "127.0.0.1:2233")
 	if err != nil {
 		return err
 	}
 	conf := io.Config{}
 	conf.Init()
-	if c.s, err = io.NewWrapIO(conn, packet.NewDefaultController(msg.NewMsgFactory()), c, io.WrapID(serialize.Id()), io.Configure(conf)); err != nil {
-		return err
-	}
+	c.s = io.NewWrapIO(
+		conn,
+		packet.NewDefaultController(msg.NewMsgFactory()),
+		dispatch.NewMultiplex(c),
+		io.WrapID(serialize.Id()),
+		io.Configure(conf))
 	c.s.Go(ctx)
 	gom.Go(func() {
 		c.Run(ctx)
@@ -63,22 +70,30 @@ func (c *Client) Connect(ctx context.Context) error {
 	return nil
 }
 
-func (c *Client) Handle(ctx context.Context, msg packet.Msg) error {
+func (c *Client) Handle(ctx context.Context, req def.RequestWriter) error {
 	select {
 	case <-ctx.Done():
-	case c.msgq <- msg:
+	case c.msgq <- req:
 	}
 	return nil
 }
 
 func (c *Client) Run(ctx context.Context) {
 	t := time.NewTicker(100 * time.Millisecond)
+	data := &pb.Echo{
+		Data: "echo 测试，能不能通过？答：能通过就好了",
+	}
 	for {
 		select {
-		case msg := <-c.msgq:
-			_ = msg
+		case req := <-c.msgq:
+			if _, ok := req.(*io.CloseIO); ok {
+				c.s.Close(0)
+				return
+			} else {
+				jlog.Infof("Receive Msg Id:%d, info:%v", req.Msg().MsgID(), req.Msg())
+			}
 		case <-t.C:
-			if err := c.s.SendMessage(&msg.Echo{Data: "echo 测试，能不能通过？答：能通过就好了"}); err != nil {
+			if err := c.s.WritePacket(packet.NewPacket(packet.Request, data)); err != nil {
 				// fmt.Println(err)
 			}
 		case <-ctx.Done():

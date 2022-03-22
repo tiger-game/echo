@@ -67,6 +67,8 @@ func (*Echo) Descriptor() ([]byte, []int) {
 	return file_echo_proto_rawDescGZIP(), []int{0}
 }
 
+func (x *Echo) MsgID() int16 { return 1 }
+
 func (x *Echo) GetData() string {
 	if x != nil {
 		return x.Data

@@ -3,6 +3,8 @@ package echo
 import (
 	"context"
 	"fmt"
+	"github.com/tiger-game/tiger/def"
+	"github.com/tiger-game/tiger/dispatch"
 	"net"
 	"time"
 
@@ -18,20 +20,21 @@ import (
 
 var (
 	_ xserver.IServer = (*Server)(nil)
-	_ packet.Handler  = (*Server)(nil)
+	_ def.Handler     = (*Server)(nil)
 )
 
 type Server struct {
 	base   *xserver.Server
-	c      chan packet.Msg
+	c      chan def.RequestWriter
 	logger jlog.Logger
-	smap   map[uint64]*io.WrapIO
+	smap   map[uint64]io.OuterIO
 	reqCnt atomic.Uint64
 	qps    atomic.Uint64
 	tick   *time.Ticker
 }
 
-func (s *Server) ID() uint64 { return 1 }
+func (s *Server) Type() def.ServTP { return def.Server }
+func (s *Server) ID() def.ServID   { return def.ServID(1) }
 
 func (s *Server) AfterInit() error {
 	return nil
@@ -50,14 +53,15 @@ func (s *Server) Init(srv *xserver.Server) error {
 
 func (s *Server) Loop(ctx context.Context, delta xtime.DeltaTimeMsec) {
 	select {
-	case msg := <-s.c:
-		if n, ok := msg.(*io.NotifyNewStream); ok {
-			s.smap[n.ID()] = n.WrapIO
-			n.Go(ctx)
+	case req := <-s.c:
+		if n, ok := req.(*NotifyNewIO); ok {
+			s.smap[n.ID()] = n.OuterIO
 			s.logger.Info("New Session Id:", n.ID())
+		} else if cl, ok := req.(*io.CloseIO); ok {
+			delete(s.smap, cl.Raw().ID())
 		} else {
-			// TODO(mawei):w.SendMessage(w)
-			s.logger.Info("Receive Info:", msg.MsgID(), " Json:", msg)
+			req.Response(ctx, req.Msg())
+			s.logger.Info("Receive Info:", req.Msg().MsgID(), " Json:", req.Msg())
 			s.qps.Inc()
 			s.reqCnt.Inc()
 		}
@@ -69,10 +73,11 @@ func (s *Server) Loop(ctx context.Context, delta xtime.DeltaTimeMsec) {
 	}
 }
 
-func (s *Server) Handle(ctx context.Context, msg packet.Msg) error {
+func (s *Server) Handle(ctx context.Context, req def.RequestWriter) error {
 	select {
 	case <-ctx.Done():
-	case s.c <- msg:
+		return fmt.Errorf("server.Handle cancel deal request:%v", req)
+	case s.c <- req:
 	}
 	return nil
 }
@@ -80,8 +85,7 @@ func (s *Server) Handle(ctx context.Context, msg packet.Msg) error {
 // AsyncConnectMe run in single goroutine.
 func (s *Server) AsyncConnectMe(ctx context.Context, raw net.Conn) error {
 	var (
-		w   *io.WrapIO
-		err error
+		w *io.WrapIO
 	)
 	if t, ok := raw.(*net.TCPConn); ok && t == nil {
 		s.logger.Infof("Raw Nil, %v", t)
@@ -96,34 +100,19 @@ func (s *Server) AsyncConnectMe(ctx context.Context, raw net.Conn) error {
 	}
 	conf.Init()
 
-	if w, err = io.NewWrapIO(
+	w = io.NewWrapIO(
 		raw,
 		packet.NewDefaultController(msg.NewMsgFactory()),
-		s,
+		dispatch.NewMultiplex(s),
 		io.WrapID(serialize.Id()),
 		io.Configure(conf),
-	); err != nil {
-		return fmt.Errorf("xserver.Server async new session error:%v", err)
-	}
-
-	/*
-		if sess, err = session.NewRSession(raw,
-			packet.NewDefaultController(msg.NewMsgFactory(), 0),
-			session.Id(serialize.Id()),
-			session.Configure(conf),
-		); err != nil {
-			return fmt.Errorf("xserver.Server async new session error:%v", err)
-		}
-
-		gom.Go(func() {
-			s.gogo(ctx, sess.(session.RSessioner))
-		})
-	*/
+	)
 
 	// TODO: 4.notify router where I am.
 
+	w.Go(ctx)
 	// 5.add session to session manager.
-	_ = s.Handle(ctx, &io.NotifyNewStream{WrapIO: w})
+	_ = s.Handle(ctx, &NotifyNewIO{OuterIO: w})
 	return nil
 }
 
@@ -135,8 +124,8 @@ func (s *Server) Stop() {
 
 func NewServer() *Server {
 	s := &Server{
-		c:    make(chan packet.Msg, 16),
-		smap: make(map[uint64]*io.WrapIO),
+		c:    make(chan def.RequestWriter, 16),
+		smap: make(map[uint64]io.OuterIO, 8),
 	}
 	return s
 }
