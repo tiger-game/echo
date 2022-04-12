@@ -1,0 +1,13 @@
+syntax="proto3";
+
+import "google/protobuf/descriptor.proto";
+
+option go_package="./;pb";
+
+extend google.protobuf.MessageOptions {
+  int32 MsgID = 1000 [(Type) = "int16"];
+}
+
+extend google.protobuf.FieldOptions {
+  string Type = 1000;
+}

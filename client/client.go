@@ -83,6 +83,7 @@ func (c *Client) Run(ctx context.Context) {
 	data := &pb.Echo{
 		Data: "echo 测试，能不能通过？答：能通过就好了",
 	}
+
 	for {
 		select {
 		case req := <-c.msgq:
